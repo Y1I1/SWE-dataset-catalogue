@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <div class="page-header"><h1>Source systems</h1><a class="btn btn-primary" href="{{ url_for('admin.source_system_create') }}">New</a></div>
+  <div class="table-wrap card">
+    <table class="data-table">
+      <caption>Source systems</caption>
+      <thead><tr><th scope="col">Name</th><th scope="col">Hostname</th><th scope="col">Actions</th></tr></thead>
+      <tbody>
+        {% for item in source_systems %}
+        <tr>
+          <td>{{ item.name }}</td><td>{{ item.hostname or '—' }}</td>
+          <td><a href="{{ url_for('admin.source_system_edit', item_id=item.id) }}">Edit</a> · <a href="{{ url_for('admin.source_system_delete', item_id=item.id) }}">Delete</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

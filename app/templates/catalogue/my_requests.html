@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h1>My access requests</h1>
+  <div class="table-wrap card">
+    <table class="data-table">
+      <caption>Your dataset access requests</caption>
+      <thead>
+        <tr>
+          <th scope="col">Dataset</th>
+          <th scope="col">Reason</th>
+          <th scope="col">Status</th>
+          <th scope="col">Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in requests %}
+        <tr>
+          <td>{{ item.dataset.name }}</td>
+          <td>{{ item.reason }}</td>
+          <td><span class="badge">{{ item.status.value }}</span></td>
+          <td>{{ item.created_at.strftime('%Y-%m-%d') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">You have not submitted any access requests yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import render_field %}
+{% block content %}
+<section class="card narrow">
+  <h1>Edit {{ user.email }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ render_field(form.full_name, required=true) }}
+    {{ render_field(form.role, required=true) }}
+    <div class="form-field">{{ form.is_active() }} {{ form.is_active.label(class='form-label inline') }}</div>
+    <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <div class="page-header"><h1>Datasets</h1><a class="btn btn-primary" href="{{ url_for('admin.dataset_create') }}">New dataset</a></div>
+  <div class="table-wrap card">
+    <table class="data-table">
+      <caption>All datasets</caption>
+      <thead><tr><th scope="col">Name</th><th scope="col">Classification</th><th scope="col">Active</th><th scope="col">Actions</th></tr></thead>
+      <tbody>
+        {% for dataset in datasets %}
+        <tr>
+          <td>{{ dataset.name }}</td>
+          <td>{{ dataset.classification.label }}</td>
+          <td>{{ 'Yes' if dataset.is_active else 'No' }}</td>
+          <td>
+            <a href="{{ url_for('admin.dataset_edit', dataset_id=dataset.id) }}">Edit</a>
+            {% if dataset.is_active %} · <a href="{{ url_for('admin.dataset_delete', dataset_id=dataset.id) }}">Deactivate</a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

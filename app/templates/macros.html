@@ -1,0 +1,10 @@
+{% macro render_field(field, required=false) %}
+  <div class="form-field{% if field.errors %} form-field-error{% endif %}">
+    {{ field.label(class='form-label') }}
+    {% if required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}
+    {{ field(class='form-control', aria_describedby=field.id ~ '-error') }}
+    {% if field.errors %}
+      <p id="{{ field.id }}-error" class="field-error" role="alert">{{ field.errors[0] }}</p>
+    {% endif %}
+  </div>
+{% endmacro %}

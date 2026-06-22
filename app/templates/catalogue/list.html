@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <div class="page-header">
+    <h1>Catalogue</h1>
+    <p class="lede">Browse and search datasets.</p>
+  </div>
+
+  <form method="get" class="card filter-form" aria-label="Search catalogue">
+    <div class="form-grid">
+      <div class="form-field">
+        {{ form.q.label(class='form-label') }}
+        {{ form.q(class='form-control') }}
+      </div>
+      <div class="form-field">
+        {{ form.classification.label(class='form-label') }}
+        {{ form.classification(class='form-control') }}
+      </div>
+      <div class="form-field">
+        {{ form.source_system.label(class='form-label') }}
+        {{ form.source_system(class='form-control') }}
+      </div>
+      <div class="form-field">
+        {{ form.sort.label(class='form-label') }}
+        {{ form.sort(class='form-control') }}
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+
+  <div class="table-wrap card">
+    <table class="data-table">
+      <caption>Datasets in the catalogue</caption>
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Classification</th>
+          <th scope="col">Source system</th>
+          <th scope="col">Owner</th>
+          <th scope="col">Access</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for dataset in datasets %}
+        <tr>
+          <td><a href="{{ url_for('catalogue.dataset_detail', dataset_id=dataset.id) }}">{{ dataset.name }}</a></td>
+          <td>{{ dataset.classification.label }}</td>
+          <td>{{ dataset.source_system.name }}</td>
+          <td>{{ dataset.owner.full_name }}</td>
+          <td>
+            {% if can_view(current_user, dataset) %}
+            <span class="badge badge-open">Open</span>
+            {% else %}
+            <span class="badge badge-locked">Gated</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No datasets match your search.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

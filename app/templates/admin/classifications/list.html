@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <div class="page-header"><h1>Classifications</h1><a class="btn btn-primary" href="{{ url_for('admin.classification_create') }}">New</a></div>
+  <div class="table-wrap card">
+    <table class="data-table">
+      <caption>Data classifications</caption>
+      <thead><tr><th scope="col">Label</th><th scope="col">Rank</th><th scope="col">Actions</th></tr></thead>
+      <tbody>
+        {% for item in classifications %}
+        <tr>
+          <td>{{ item.label }}</td><td>{{ item.rank }}</td>
+          <td><a href="{{ url_for('admin.classification_edit', item_id=item.id) }}">Edit</a> · <a href="{{ url_for('admin.classification_delete', item_id=item.id) }}">Delete</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

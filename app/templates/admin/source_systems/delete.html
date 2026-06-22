@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card narrow">
+  <h1>Delete {{ item.name }}?</h1>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <button type="submit" class="btn btn-primary">Confirm delete</button>
+    <a class="btn btn-secondary" href="{{ url_for('admin.source_systems') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

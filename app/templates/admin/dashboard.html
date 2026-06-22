@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h1>Admin</h1>
+  <div class="card-grid">
+    <a class="card card-link" href="{{ url_for('admin.access_requests') }}">
+      <h2>Access requests</h2>
+      <p>{{ pending_count }} pending</p>
+    </a>
+    <a class="card card-link" href="{{ url_for('admin.datasets') }}"><h2>Datasets</h2></a>
+    <a class="card card-link" href="{{ url_for('admin.classifications') }}"><h2>Classifications</h2></a>
+    <a class="card card-link" href="{{ url_for('admin.source_systems') }}"><h2>Source systems</h2></a>
+    <a class="card card-link" href="{{ url_for('admin.users') }}"><h2>Users</h2></a>
+  </div>
+</section>
+{% endblock %}

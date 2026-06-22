@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h1>Access requests</h1>
+  <div class="table-wrap card">
+    <table class="data-table">
+      <caption>All access requests</caption>
+      <thead>
+        <tr>
+          <th scope="col">Dataset</th>
+          <th scope="col">Requester</th>
+          <th scope="col">Reason</th>
+          <th scope="col">Status</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in requests %}
+        <tr>
+          <td>{{ item.dataset.name }}</td>
+          <td>{{ item.requester.full_name }}</td>
+          <td>{{ item.reason }}</td>
+          <td>{{ item.status.value }}</td>
+          <td>
+            {% if item.status.value == 'pending' %}
+            <form method="post" action="{{ url_for('admin.approve_request', request_id=item.id) }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-primary">Approve</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.reject_request', request_id=item.id) }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-secondary">Reject</button>
+            </form>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No access requests found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card narrow">
+  <h1>Deactivate {{ dataset.name }}?</h1>
+  <p>This hides the dataset from the catalogue. Existing access requests are kept.</p>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <button type="submit" class="btn btn-primary">Confirm deactivate</button>
+    <a class="btn btn-secondary" href="{{ url_for('admin.datasets') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

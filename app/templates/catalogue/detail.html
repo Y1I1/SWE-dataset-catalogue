@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import render_field %}
+{% block content %}
+<section>
+  <p class="breadcrumb"><a href="{{ url_for('catalogue.list_datasets') }}">Catalogue</a> / {{ dataset.name }}</p>
+  <h1>{{ dataset.name }}</h1>
+
+  {% if allowed %}
+  <div class="card detail-grid">
+    <dl>
+      <div><dt>Classification</dt><dd>{{ dataset.classification.label }}</dd></div>
+      <div><dt>Source system</dt><dd>{{ dataset.source_system.name }}</dd></div>
+      <div><dt>Owner</dt><dd>{{ dataset.owner.full_name }}</dd></div>
+      <div><dt>Row count</dt><dd>{{ '{:,}'.format(dataset.row_count) if dataset.row_count is not none else '—' }}</dd></div>
+      <div><dt>Refresh</dt><dd>{{ dataset.refresh_frequency.value.replace('_', ' ') | title }}</dd></div>
+      <div><dt>Last refreshed</dt><dd>{{ dataset.last_refreshed or '—' }}</dd></div>
+    </dl>
+    <p>{{ dataset.description }}</p>
+  </div>
+  {% else %}
+  <div class="card">
+    <p class="notice">This dataset is classified as <strong>{{ dataset.classification.label }}</strong>. Request access to view full details.</p>
+    {% if pending_request %}
+    <p>Your access request is <strong>pending</strong> approval.</p>
+    {% else %}
+    <form method="post" action="{{ url_for('catalogue.request_access', dataset_id=dataset.id) }}" novalidate>
+      {{ request_form.hidden_tag() }}
+      {{ render_field(request_form.reason, required=true) }}
+      <button type="submit" class="btn btn-primary">Request access</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

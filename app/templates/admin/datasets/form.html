@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import render_field %}
+{% block content %}
+<section class="card narrow">
+  <h1>{{ title }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ render_field(form.name, required=true) }}
+    {{ render_field(form.description) }}
+    {{ render_field(form.classification_id, required=true) }}
+    {{ render_field(form.source_system_id, required=true) }}
+    {{ render_field(form.owner_id, required=true) }}
+    {{ render_field(form.row_count) }}
+    {{ render_field(form.refresh_frequency, required=true) }}
+    {{ render_field(form.last_refreshed) }}
+    <div class="form-field">{{ form.is_active() }} {{ form.is_active.label(class='form-label inline') }}</div>
+    <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+  </form>
+</section>
+{% endblock %}
