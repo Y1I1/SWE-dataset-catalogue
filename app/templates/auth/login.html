@@ -3,14 +3,7 @@
 {% block content %}
 <div class="auth-shell">
   <section class="card narrow auth-card">
-    <a class="auth-logo" href="{{ url_for('index') }}">
-      <img
-        src="{{ url_for('static', filename='img/logo.png') }}"
-        alt="Data Cataloger"
-        width="220"
-        height="66"
-      >
-    </a>
+    <p class="auth-brand">Data Cataloger</p>
     <h1>Sign in</h1>
     <p class="lede">Use a test account from the README or register a new viewer account.</p>
     <form method="post" novalidate>

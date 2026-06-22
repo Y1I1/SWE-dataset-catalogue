@@ -3,14 +3,7 @@
 {% block content %}
 <div class="auth-shell">
   <section class="card narrow auth-card">
-    <a class="auth-logo" href="{{ url_for('index') }}">
-      <img
-        src="{{ url_for('static', filename='img/logo.png') }}"
-        alt="Data Cataloger"
-        width="220"
-        height="66"
-      >
-    </a>
+    <p class="auth-brand">Data Cataloger</p>
     <h1>Register</h1>
     <form method="post" novalidate>
       {{ form.hidden_tag() }}
