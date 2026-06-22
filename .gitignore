@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 __pycache__/
@@ -7,3 +9,15 @@ __pycache__/
 .coverage
 htmlcov/
 .ruff_cache/
+
+# Keep local coursework / planning outside the repo
+*.docx
+*-build-spec.md
+build-spec.md
+docs/
+evidence/
+
+# IDE / tooling
+.cursor/
+.vscode/
+*.swp

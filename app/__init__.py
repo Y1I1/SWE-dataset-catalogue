@@ -1,3 +1,4 @@
+import os
 import uuid
 
 import click
@@ -17,6 +18,12 @@ def create_app(config_name: str | None = None) -> Flask:
     app = Flask(__name__)
     config_name = (config_name or get_config_name()).lower()
     app.config.from_object(config_by_name.get(config_name, config_by_name["dev"]))
+
+    if config_name not in ("test", "testing"):
+        if os.getenv("DATABASE_URL"):
+            app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+        if os.getenv("SECRET_KEY"):
+            app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
     db.init_app(app)
     login_manager.init_app(app)
