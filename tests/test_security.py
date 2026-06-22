@@ -22,12 +22,16 @@ def test_xss_payload_is_escaped(client, viewer_user):
     assert b"<script>" not in response.data
 
 
-def test_prod_config_debug_off():
+def test_prod_config_debug_off(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SECRET_KEY", "prod-test-secret")
     app = create_app("prod")
     assert app.config["DEBUG"] is False
 
 
-def test_security_headers_in_prod():
+def test_security_headers_in_prod(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SECRET_KEY", "prod-test-secret")
     app = create_app("prod")
     client = app.test_client()
     response = client.get("/auth/login", follow_redirects=True)
