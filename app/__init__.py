@@ -25,6 +25,11 @@ def create_app(config_name: str | None = None) -> Flask:
         if os.getenv("SECRET_KEY"):
             app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
+    if config_name in ("prod", "production"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     db.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)

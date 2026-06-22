@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: dataset-catalogue
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app --bind 0.0.0.0:$PORT
+    releaseCommand: flask --app run.py init-db && flask --app run.py seed
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: FLASK_CONFIG
+        value: prod
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
