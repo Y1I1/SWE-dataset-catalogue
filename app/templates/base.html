@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ title | default('Dataset Catalogue') }}{% endblock %} · Dataset Catalogue</title>
+  <title>{% block title %}{{ title | default('Data Cataloger') }}{% endblock %} · Data Cataloger</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
@@ -11,7 +11,15 @@
 
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="{{ url_for('index') }}">Dataset Catalogue</a>
+      <a class="brand" href="{{ url_for('index') }}">
+        <img
+          class="brand-logo"
+          src="{{ url_for('static', filename='img/logo.png') }}"
+          alt="Data Cataloger"
+          width="160"
+          height="48"
+        >
+      </a>
       {% if current_user.is_authenticated %}
       <nav class="site-nav" aria-label="Primary">
         <a href="{{ url_for('catalogue.list_datasets') }}">Catalogue</a>
@@ -38,7 +46,7 @@
 
   <footer class="site-footer">
     <div class="container">
-      <p>Internal Dataset Catalogue</p>
+      <p>Data Cataloger</p>
     </div>
   </footer>
 </body>

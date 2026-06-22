@@ -1,15 +1,25 @@
 {% extends 'base.html' %}
 {% from 'macros.html' import render_field %}
 {% block content %}
-<section class="card narrow">
-  <h1>Sign in</h1>
-  <p class="lede">Use a test account from docs/INSTALL.md or register a new viewer account.</p>
-  <form method="post" novalidate>
-    {{ form.hidden_tag() }}
-    {{ render_field(form.email, required=true) }}
-    {{ render_field(form.password, required=true) }}
-    <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
-  </form>
-  <p class="form-footer"><a href="{{ url_for('auth.register') }}">Create an account</a></p>
-</section>
+<div class="auth-shell">
+  <section class="card narrow auth-card">
+    <a class="auth-logo" href="{{ url_for('index') }}">
+      <img
+        src="{{ url_for('static', filename='img/logo.png') }}"
+        alt="Data Cataloger"
+        width="220"
+        height="66"
+      >
+    </a>
+    <h1>Sign in</h1>
+    <p class="lede">Use a test account from the README or register a new viewer account.</p>
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {{ render_field(form.email, required=true) }}
+      {{ render_field(form.password, required=true) }}
+      <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+    </form>
+    <p class="form-footer"><a href="{{ url_for('auth.register') }}">Create an account</a></p>
+  </section>
+</div>
 {% endblock %}
