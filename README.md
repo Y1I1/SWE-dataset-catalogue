@@ -272,7 +272,7 @@ The `prod` configuration enables HTTPS enforcement, a strict Content-Security-Po
 
 ## Test accounts
 
-Created by the seed script. Default password for all accounts: `CatalogueDemo2024!`
+Created by the seed script. Default password for all accounts: `CatalogueDemo2026!`
 
 | Email | Role |
 |---|---|

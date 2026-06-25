@@ -12,7 +12,7 @@ from app.models import (
     UserRole,
 )
 
-SEED_PASSWORD = "CatalogueDemo2024!"
+SEED_PASSWORD = "CatalogueDemo2026!"
 
 
 def run_seed() -> None:
