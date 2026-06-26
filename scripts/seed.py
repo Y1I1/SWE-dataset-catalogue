@@ -1,3 +1,4 @@
+import os
 from datetime import date, datetime, timedelta, timezone
 
 from app.db import db
@@ -16,8 +17,17 @@ SEED_PASSWORD = "CatalogueDemo2026!"
 
 
 def run_seed() -> None:
+    reset_pw = os.getenv("RESET_ALL_PASSWORDS")
+
     if User.query.first():
-        print("Already seeded — skipping.")
+        if reset_pw:
+            users = User.query.all()
+            for u in users:
+                u.set_password(reset_pw)
+            db.session.commit()
+            print(f"Passwords reset for {len(users)} user(s).")
+        else:
+            print("Already seeded — skipping.")
         return
 
     classifications = _seed_classifications()

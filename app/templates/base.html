@@ -6,6 +6,7 @@
   <title>{% block title %}{{ title | default('Data Cataloger') }}{% endblock %} · Data Cataloger</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>

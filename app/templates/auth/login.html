@@ -9,7 +9,17 @@
     <form method="post" novalidate>
       {{ form.hidden_tag() }}
       {{ render_field(form.email, required=true) }}
-      {{ render_field(form.password, required=true) }}
+      <div class="form-field">
+        {{ form.password.label(class='form-label') }}
+        <span class="required-mark" aria-hidden="true">*</span>
+        <div class="password-wrapper">
+          {{ form.password(class='form-control', id='password', aria_describedby='password-error') }}
+          <button type="button" class="btn-show-password" data-target="password" aria-label="Show password">Show</button>
+        </div>
+        {% if form.password.errors %}
+          <p id="password-error" class="field-error" role="alert">{{ form.password.errors[0] }}</p>
+        {% endif %}
+      </div>
       <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
     </form>
     <p class="form-footer"><a href="{{ url_for('auth.register') }}">Create an account</a></p>
