@@ -1,11 +1,36 @@
+from datetime import datetime, timedelta, timezone
+
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.auth import auth_bp
 from app.auth.forms import LoginForm, RegisterForm
 from app.db import db
-from app.extensions import limiter
-from app.models import User, UserRole
+from app.models import LoginAttempt, User, UserRole
+
+_MAX_ATTEMPTS = 10
+_WINDOW = timedelta(minutes=1)
+
+
+def _client_ip() -> str:
+    return request.remote_addr or "unknown"
+
+
+def _is_rate_limited() -> bool:
+    cutoff = datetime.now(timezone.utc) - _WINDOW
+    count = LoginAttempt.query.filter(
+        LoginAttempt.ip_address == _client_ip(),
+        LoginAttempt.attempted_at >= cutoff,
+    ).count()
+    return count >= _MAX_ATTEMPTS
+
+
+def _record_failed_attempt() -> None:
+    # Prune attempts older than 1 hour to keep the table small
+    old_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    LoginAttempt.query.filter(LoginAttempt.attempted_at < old_cutoff).delete()
+    db.session.add(LoginAttempt(ip_address=_client_ip()))
+    db.session.commit()
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -31,22 +56,25 @@ def register():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("10 per minute", methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("catalogue.list_datasets"))
+
+    if request.method == "POST" and _is_rate_limited():
+        flash("Too many login attempts. Please wait a minute and try again.", "error")
+        return render_template("auth/login.html", form=LoginForm(), title="Sign in")
 
     form = LoginForm()
     if request.method == "POST" and form.validate():
         email = form.email.data.strip().lower()
         user = User.query.filter_by(email=email, is_active=True).first()
         if user is None or not user.check_password(form.password.data):
+            _record_failed_attempt()
             flash("Invalid email or password.", "error")
         else:
             login_user(user)
             flash("Signed in successfully.", "success")
-            next_page = url_for("catalogue.list_datasets")
-            return redirect(next_page)
+            return redirect(url_for("catalogue.list_datasets"))
 
     return render_template("auth/login.html", form=form, title="Sign in")
 

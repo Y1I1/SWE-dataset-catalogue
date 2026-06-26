@@ -35,14 +35,12 @@ def create_app(config_name: str | None = None) -> Flask:
     csrf.init_app(app)
     limiter.init_app(app)
 
-    if not app.config.get("RATELIMIT_ENABLED", True):
-        app.config["RATELIMIT_ENABLED"] = False
-
     if app.config.get("TALISMAN_ENABLED", True):
         talisman.init_app(
             app,
             content_security_policy=app.config.get("TALISMAN_CONTENT_SECURITY_POLICY"),
             force_https=app.config.get("TALISMAN_FORCE_HTTPS", False),
+            session_cookie_secure=app.config.get("SESSION_COOKIE_SECURE", True),
         )
 
     login_manager.login_view = "auth.login"
