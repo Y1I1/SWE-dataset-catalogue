@@ -247,6 +247,34 @@ h2 { font-size: var(--text-lg); margin: 0 0 var(--space-3); font-weight: 600; }
 .form-field-error .form-control { border-color: var(--color-error); }
 .required-mark { color: var(--color-error); }
 
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-wrapper .form-control {
+  padding-right: 4.5rem;
+}
+.btn-show-password {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+  line-height: 1;
+}
+.btn-show-password:hover { color: var(--color-accent-hover); }
+.btn-show-password:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .flash-region { margin-bottom: var(--space-4); }
 .flash {
   padding: var(--space-3) var(--space-4);
