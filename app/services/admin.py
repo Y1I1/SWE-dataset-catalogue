@@ -79,6 +79,17 @@ def validate_unique_label(model, label: str, existing_id: int | None = None) -> 
     return label
 
 
+def validate_unique_rank(rank: int, existing_id: int | None = None) -> int:
+    from app.models import Classification
+
+    query = Classification.query.filter(Classification.rank == rank)
+    if existing_id is not None:
+        query = query.filter(Classification.id != existing_id)
+    if query.first():
+        raise AdminValidationError(f"Rank {rank} is already assigned to another classification.")
+    return rank
+
+
 def parse_refresh_frequency(value: str) -> RefreshFrequency:
     try:
         return RefreshFrequency(value)

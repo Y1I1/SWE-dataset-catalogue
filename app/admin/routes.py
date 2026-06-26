@@ -33,6 +33,7 @@ from app.services.admin import (
     validate_dataset_name,
     validate_unique_label,
     validate_unique_name,
+    validate_unique_rank,
 )
 
 
@@ -216,9 +217,10 @@ def classification_create():
     if request.method == "POST" and form.validate():
         try:
             label = validate_unique_label(Classification, form.label.data)
+            rank = validate_unique_rank(form.rank.data)
             row = Classification(
                 label=label,
-                rank=form.rank.data,
+                rank=rank,
                 description=(form.description.data or "").strip() or None,
             )
             db.session.add(row)
@@ -240,7 +242,7 @@ def classification_edit(item_id: int):
     if request.method == "POST" and form.validate():
         try:
             row.label = validate_unique_label(Classification, form.label.data, row.id)
-            row.rank = form.rank.data
+            row.rank = validate_unique_rank(form.rank.data, row.id)
             row.description = (form.description.data or "").strip() or None
             db.session.commit()
             flash("Classification updated.", "success")

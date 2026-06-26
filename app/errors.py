@@ -1,5 +1,7 @@
 from flask import flash, redirect, render_template, url_for
 
+from app.db import db
+
 
 def register_error_handlers(app):
     @app.errorhandler(403)
@@ -12,6 +14,7 @@ def register_error_handlers(app):
 
     @app.errorhandler(500)
     def server_error(_error):
+        db.session.rollback()
         return render_template("errors/500.html"), 500
 
     @app.errorhandler(429)
