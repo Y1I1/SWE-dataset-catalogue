@@ -22,6 +22,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.models.audit_event import AuditAction
 from app.security.decorators import role_required
 from app.services import access_requests as access_request_service
 from app.services.admin import (
@@ -35,6 +36,7 @@ from app.services.admin import (
     validate_unique_name,
     validate_unique_rank,
 )
+from app.services.audit import write_audit
 
 
 def _populate_dataset_form(form: DatasetForm) -> None:
@@ -137,6 +139,14 @@ def dataset_create():
                 is_active=form.is_active.data,
             )
             db.session.add(dataset)
+            db.session.flush()
+            write_audit(
+                AuditAction.dataset_created,
+                target_type="dataset",
+                target_id=dataset.id,
+                actor_id=current_user.id,
+                meta={"name": dataset.name},
+            )
             db.session.commit()
             flash("Dataset created.", "success")
             return redirect(url_for("admin.datasets"))
@@ -166,6 +176,13 @@ def dataset_edit(dataset_id: uuid.UUID):
             dataset.refresh_frequency = parse_refresh_frequency(form.refresh_frequency.data)
             dataset.last_refreshed = parse_optional_date(form.last_refreshed.data, "Last refreshed")
             dataset.is_active = form.is_active.data
+            write_audit(
+                AuditAction.dataset_updated,
+                target_type="dataset",
+                target_id=dataset.id,
+                actor_id=current_user.id,
+                meta={"name": dataset.name},
+            )
             db.session.commit()
             flash("Dataset updated.", "success")
             return redirect(url_for("admin.datasets"))
@@ -188,6 +205,13 @@ def dataset_delete(dataset_id: uuid.UUID):
     form = ConfirmDeleteForm()
     if request.method == "POST" and form.validate():
         dataset.is_active = False
+        write_audit(
+            AuditAction.dataset_deactivated,
+            target_type="dataset",
+            target_id=dataset.id,
+            actor_id=current_user.id,
+            meta={"name": dataset.name},
+        )
         db.session.commit()
         flash("Dataset deactivated.", "success")
         return redirect(url_for("admin.datasets"))
@@ -224,6 +248,14 @@ def classification_create():
                 description=(form.description.data or "").strip() or None,
             )
             db.session.add(row)
+            db.session.flush()
+            write_audit(
+                AuditAction.classification_created,
+                target_type="classification",
+                target_id=row.id,
+                actor_id=current_user.id,
+                meta={"label": label, "rank": rank},
+            )
             db.session.commit()
             flash("Classification created.", "success")
             return redirect(url_for("admin.classifications"))
@@ -244,6 +276,13 @@ def classification_edit(item_id: int):
             row.label = validate_unique_label(Classification, form.label.data, row.id)
             row.rank = validate_unique_rank(form.rank.data, row.id)
             row.description = (form.description.data or "").strip() or None
+            write_audit(
+                AuditAction.classification_updated,
+                target_type="classification",
+                target_id=row.id,
+                actor_id=current_user.id,
+                meta={"label": row.label, "rank": row.rank},
+            )
             db.session.commit()
             flash("Classification updated.", "success")
             return redirect(url_for("admin.classifications"))
@@ -268,6 +307,13 @@ def classification_delete(item_id: int):
         if classification_in_use(row.id):
             flash("Cannot delete: active datasets still use this classification.", "error")
         else:
+            write_audit(
+                AuditAction.classification_deleted,
+                target_type="classification",
+                target_id=row.id,
+                actor_id=current_user.id,
+                meta={"label": row.label},
+            )
             db.session.delete(row)
             db.session.commit()
             flash("Classification deleted.", "success")
@@ -304,6 +350,14 @@ def source_system_create():
                 hostname=(form.hostname.data or "").strip() or None,
             )
             db.session.add(row)
+            db.session.flush()
+            write_audit(
+                AuditAction.source_system_created,
+                target_type="source_system",
+                target_id=row.id,
+                actor_id=current_user.id,
+                meta={"name": name},
+            )
             db.session.commit()
             flash("Source system created.", "success")
             return redirect(url_for("admin.source_systems"))
@@ -324,6 +378,13 @@ def source_system_edit(item_id: int):
             row.name = validate_unique_name(SourceSystem, form.name.data, row.id)
             row.description = (form.description.data or "").strip() or None
             row.hostname = (form.hostname.data or "").strip() or None
+            write_audit(
+                AuditAction.source_system_updated,
+                target_type="source_system",
+                target_id=row.id,
+                actor_id=current_user.id,
+                meta={"name": row.name},
+            )
             db.session.commit()
             flash("Source system updated.", "success")
             return redirect(url_for("admin.source_systems"))
@@ -348,6 +409,13 @@ def source_system_delete(item_id: int):
         if source_system_in_use(row.id):
             flash("Cannot delete: active datasets reference this source system.", "error")
         else:
+            write_audit(
+                AuditAction.source_system_deleted,
+                target_type="source_system",
+                target_id=row.id,
+                actor_id=current_user.id,
+                meta={"name": row.name},
+            )
             db.session.delete(row)
             db.session.commit()
             flash("Source system deleted.", "success")
@@ -376,9 +444,29 @@ def user_edit(user_id: uuid.UUID):
     form = UserForm(obj=user)
     form.role.data = user.role.value
     if request.method == "POST" and form.validate():
+        old_role = user.role
+        old_active = user.is_active
         user.full_name = form.full_name.data.strip()
         user.role = UserRole(form.role.data)
         user.is_active = form.is_active.data
+
+        if user.role != old_role:
+            write_audit(
+                AuditAction.user_role_changed,
+                target_type="user",
+                target_id=user.id,
+                actor_id=current_user.id,
+                meta={"from": old_role.value, "to": user.role.value},
+            )
+        if user.is_active != old_active:
+            action = AuditAction.user_activated if user.is_active else AuditAction.user_deactivated
+            write_audit(
+                action,
+                target_type="user",
+                target_id=user.id,
+                actor_id=current_user.id,
+            )
+
         db.session.commit()
         flash("User updated.", "success")
         return redirect(url_for("admin.users"))

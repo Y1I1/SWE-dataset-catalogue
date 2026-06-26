@@ -59,3 +59,42 @@ CREATE TABLE access_requests (
 CREATE UNIQUE INDEX uq_pending_request
     ON access_requests(dataset_id, requested_by)
     WHERE status = 'pending';
+
+CREATE TABLE login_attempts (
+    id           SERIAL PRIMARY KEY,
+    ip_address   TEXT NOT NULL,
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX ix_login_attempts_ip_at ON login_attempts(ip_address, attempted_at);
+
+CREATE TYPE audit_action AS ENUM (
+    'access_request_created',
+    'access_request_approved',
+    'access_request_rejected',
+    'dataset_created',
+    'dataset_updated',
+    'dataset_deactivated',
+    'classification_created',
+    'classification_updated',
+    'classification_deleted',
+    'source_system_created',
+    'source_system_updated',
+    'source_system_deleted',
+    'user_role_changed',
+    'user_activated',
+    'user_deactivated'
+);
+
+CREATE TABLE audit_events (
+    id          SERIAL PRIMARY KEY,
+    actor_id    UUID REFERENCES users(id) ON DELETE SET NULL,
+    action      audit_action NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id   TEXT,
+    meta        TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX ix_audit_events_action     ON audit_events(action);
+CREATE INDEX ix_audit_events_created_at ON audit_events(created_at);

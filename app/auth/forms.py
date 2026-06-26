@@ -25,8 +25,6 @@ class RegisterForm(FlaskForm):
         validators=[
             DataRequired(),
             Length(min=12, message="Password must be at least 12 characters."),
-            Regexp(r".*[A-Za-z].*", message="Password must include at least one letter."),
-            Regexp(r".*\d.*", message="Password must include at least one number."),
         ],
         render_kw={"autocomplete": "new-password"},
     )
