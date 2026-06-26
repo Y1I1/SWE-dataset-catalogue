@@ -1,5 +1,4 @@
 import enum
-import uuid
 from datetime import datetime, timezone
 
 from app.db import db
@@ -30,9 +29,7 @@ class AuditEvent(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     actor_id = db.Column(db.Uuid, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    action = db.Column(
-        db.Enum(AuditAction, name="audit_action"), nullable=False, index=True
-    )
+    action = db.Column(db.Enum(AuditAction, name="audit_action"), nullable=False, index=True)
     target_type = db.Column(db.String(50), nullable=False)
     target_id = db.Column(db.String(100), nullable=True)
     meta = db.Column(db.Text, nullable=True)

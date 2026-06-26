@@ -14,6 +14,4 @@ class LoginAttempt(db.Model):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    __table_args__ = (
-        db.Index("ix_login_attempts_ip_at", "ip_address", "attempted_at"),
-    )
+    __table_args__ = (db.Index("ix_login_attempts_ip_at", "ip_address", "attempted_at"),)

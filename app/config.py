@@ -75,7 +75,7 @@ def validate_prod_config(app) -> None:
     db_url = app.config.get("SQLALCHEMY_DATABASE_URI", "")
     if secret in _INSECURE_KEYS:
         raise RuntimeError(
-            "Production start-up aborted: SECRET_KEY is missing or uses a known-insecure placeholder. "
+            "Production start-up aborted: SECRET_KEY is missing or insecure. "
             "Set a strong random value in the Render environment."
         )
     if not db_url:
