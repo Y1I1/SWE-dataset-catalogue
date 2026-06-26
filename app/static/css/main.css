@@ -1,12 +1,12 @@
 :root {
-  --color-bg: #000000;
-  --color-surface: #4b4b4b;
-  --color-text: #e3e3e3;
-  --color-muted: #e3e3e3;
-  --color-border: #e3e3e3;
+  --color-bg: #e3e3e3;
+  --color-surface: #ffffff;
+  --color-text: #000000;
+  --color-muted: #4b4b4b;
+  --color-border: #4b4b4b;
   --color-accent: #d30909;
   --color-accent-hover: #711313;
-  --color-success: #e3e3e3;
+  --color-success: #4b4b4b;
   --color-error: #d30909;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -46,7 +46,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   left: -9999px;
   top: 0;
   background: var(--color-accent);
-  color: var(--color-bg);
+  color: var(--color-surface);
   padding: var(--space-2) var(--space-3);
   z-index: 1000;
 }
@@ -139,8 +139,8 @@ h1 { font-size: var(--text-xl); margin: 0 0 var(--space-3); }
   cursor: pointer;
   text-decoration: none;
 }
-.btn-primary { background: var(--color-accent); color: var(--color-bg); font-weight: 600; }
-.btn-primary:hover { background: var(--color-accent-hover); color: var(--color-bg); }
+.btn-primary { background: var(--color-accent); color: var(--color-surface); font-weight: 600; }
+.btn-primary:hover { background: var(--color-accent-hover); color: var(--color-surface); }
 .btn-secondary { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text); }
 .inline-form { display: inline; }
 
@@ -154,7 +154,7 @@ h1 { font-size: var(--text-xl); margin: 0 0 var(--space-3); }
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font: inherit;
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-text);
 }
 .form-control::placeholder { color: var(--color-muted); }
@@ -163,23 +163,23 @@ h1 { font-size: var(--text-xl); margin: 0 0 var(--space-3); }
 
 .flash-region { margin-bottom: var(--space-4); }
 .flash { padding: var(--space-3) var(--space-4); border-radius: var(--radius); margin-bottom: var(--space-2); border: 1px solid var(--color-border); }
-.flash-success { background: #4b4b4b; border-color: #e3e3e3; color: var(--color-success); }
-.flash-error { background: #711313; border-color: #d30909; color: var(--color-success); }
+.flash-success { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text); }
+.flash-error { background: var(--color-surface); border-color: var(--color-error); color: var(--color-error); }
 
 .table-wrap { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table caption { text-align: left; font-weight: 600; margin-bottom: var(--space-3); }
 .data-table th, .data-table td { padding: var(--space-3); border-bottom: 1px solid var(--color-border); text-align: left; }
 .data-table th { background: var(--color-bg); color: var(--color-text); }
-.data-table tbody tr:hover { background: rgba(211, 9, 9, 0.08); }
+.data-table tbody tr:hover { background: rgba(0, 0, 0, 0.04); }
 
 .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: var(--text-sm); border: 1px solid var(--color-border); }
-.badge-open { background: #711313; color: var(--color-success); border-color: #d30909; }
-.badge-locked { background: #4b4b4b; color: var(--color-success); border-color: #e3e3e3; }
+.badge-open { background: #4b4b4b; color: var(--color-surface); border-color: #4b4b4b; }
+.badge-locked { background: #711313; color: var(--color-surface); border-color: #d30909; }
 
 .detail-grid dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
 .detail-grid dt { font-size: var(--text-sm); color: var(--color-muted); }
-.notice { padding: var(--space-3); background: #4b4b4b; border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: var(--radius); }
+.notice { padding: var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: var(--radius); }
 
 @media (max-width: 640px) {
   .header-inner { flex-direction: column; align-items: flex-start; }
