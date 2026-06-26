@@ -45,8 +45,8 @@
         <tr>
           <td><a href="{{ url_for('catalogue.dataset_detail', dataset_id=dataset.id) }}">{{ dataset.name }}</a></td>
           <td>{{ dataset.classification.label }}</td>
-          <td>{{ dataset.source_system.name }}</td>
-          <td>{{ dataset.owner.full_name }}</td>
+          <td>{% if can_view(current_user, dataset) %}{{ dataset.source_system.name }}{% else %}—{% endif %}</td>
+          <td>{% if can_view(current_user, dataset) %}{{ dataset.owner.full_name }}{% else %}—{% endif %}</td>
           <td>
             {% if can_view(current_user, dataset) %}
             <span class="badge badge-open">Open</span>

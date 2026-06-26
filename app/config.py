@@ -5,6 +5,8 @@ from sqlalchemy.pool import StaticPool
 
 load_dotenv()
 
+_INSECURE_KEYS = {"dev-only-change-me", "change-me", "secret", ""}
+
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
@@ -65,3 +67,19 @@ config_by_name = {
 
 def get_config_name() -> str:
     return os.getenv("FLASK_CONFIG", "dev").lower()
+
+
+def validate_prod_config(app) -> None:
+    """Raise RuntimeError immediately if production config is insecure."""
+    secret = app.config.get("SECRET_KEY", "")
+    db_url = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if secret in _INSECURE_KEYS:
+        raise RuntimeError(
+            "Production start-up aborted: SECRET_KEY is missing or uses a known-insecure placeholder. "
+            "Set a strong random value in the Render environment."
+        )
+    if not db_url:
+        raise RuntimeError(
+            "Production start-up aborted: DATABASE_URL is not set. "
+            "Configure it in the Render environment."
+        )

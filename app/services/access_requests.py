@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from app.db import db
 from app.models import AccessRequest, Dataset, RequestStatus, User
+from app.models.audit_event import AuditAction
+from app.services.audit import write_audit
 from app.services.permissions import can_view_dataset
 
 
@@ -44,6 +46,13 @@ def create_request(user: User, dataset: Dataset, reason: str) -> AccessRequest:
         reason=reason.strip(),
     )
     db.session.add(access_request)
+    write_audit(
+        AuditAction.access_request_created,
+        target_type="access_request",
+        target_id=dataset.id,
+        actor_id=user.id,
+        meta={"dataset_name": dataset.name},
+    )
     db.session.commit()
     return access_request
 
@@ -65,5 +74,18 @@ def decide_request(
     access_request.status = decision
     access_request.decided_by = admin.id
     access_request.decided_at = datetime.now(timezone.utc)
+
+    action = (
+        AuditAction.access_request_approved
+        if decision == RequestStatus.approved
+        else AuditAction.access_request_rejected
+    )
+    write_audit(
+        action,
+        target_type="access_request",
+        target_id=access_request.id,
+        actor_id=admin.id,
+        meta={"dataset_id": str(access_request.dataset_id)},
+    )
     db.session.commit()
     return access_request

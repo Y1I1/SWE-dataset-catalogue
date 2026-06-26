@@ -26,10 +26,14 @@ def _is_rate_limited() -> bool:
 
 
 def _record_failed_attempt() -> None:
-    # Prune attempts older than 1 hour to keep the table small
     old_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
     LoginAttempt.query.filter(LoginAttempt.attempted_at < old_cutoff).delete()
     db.session.add(LoginAttempt(ip_address=_client_ip()))
+    db.session.commit()
+
+
+def _clear_attempts() -> None:
+    LoginAttempt.query.filter_by(ip_address=_client_ip()).delete()
     db.session.commit()
 
 
@@ -72,6 +76,7 @@ def login():
             _record_failed_attempt()
             flash("Invalid email or password.", "error")
         else:
+            _clear_attempts()
             login_user(user)
             flash("Signed in successfully.", "success")
             return redirect(url_for("catalogue.list_datasets"))

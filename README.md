@@ -38,13 +38,13 @@ In many large organisations data is heavily **siloed** — customer data in a CR
 
 **Data Cataloguer** attacks that problem directly. It provides one searchable catalogue of datasets spanning every source system, surfaces each dataset's owner, classification, row count and refresh cadence, and gates access to sensitive datasets behind an explicit admin approval workflow.
 
-Sensitivity is modelled as ranked **classifications** (Public → Internal → Confidential → Restricted). Public and Internal datasets are visible to all signed-in staff; Confidential and Restricted datasets are gated until an administrator approves an access request.
+Sensitivity is modelled as ranked **classifications** (Public → Internal → Confidential → Restricted). Public and Internal datasets are visible to all signed-in staff; Confidential and Restricted datasets are gated until an administrator approves an access request. Viewers of gated datasets see only the dataset name and classification — source system and owner are masked until access is granted.
 
 ## Features
 
 **Viewers** can:
 - Browse and search the full dataset catalogue (free-text, by classification, by source system, sortable).
-- View full metadata for any dataset they are entitled to see.
+- View full metadata for any dataset they are entitled to see; gated datasets show only name and classification until approved.
 - Request access to gated (Confidential/Restricted) datasets with a written justification.
 - Track the status of their own access requests.
 - Toggle password visibility on the sign-in form.
@@ -53,6 +53,7 @@ Sensitivity is modelled as ranked **classifications** (Public → Internal → C
 - Manage datasets, classifications and source systems (create, edit, deactivate/delete).
 - Manage users (edit role and active status).
 - Approve or reject pending access requests.
+- Every administrative action is recorded in an append-only audit log.
 
 ## Tech stack
 
@@ -61,6 +62,7 @@ Sensitivity is modelled as ranked **classifications** (Public → Internal → C
 | Language | Python 3.12 |
 | Web framework | Flask 3.1 |
 | ORM | Flask-SQLAlchemy 3.1 / SQLAlchemy 2.0 |
+| Schema migrations | Flask-Migrate 4.0 / Alembic |
 | Forms & CSRF | Flask-WTF + WTForms |
 | Authentication | Flask-Login |
 | Security headers / CSP | Flask-Talisman |
@@ -69,7 +71,7 @@ Sensitivity is modelled as ranked **classifications** (Public → Internal → C
 | Database (tests) | SQLite (in-memory) |
 | WSGI server | Gunicorn |
 | Hosting | Render |
-| CI | GitHub Actions |
+| CI | GitHub Actions + pip-audit |
 | Tooling | black, isort, ruff, pytest, pytest-cov |
 
 ## Architecture
@@ -86,8 +88,8 @@ flowchart TB
         C["catalogue"]
         AD["admin"]
       end
-      SVC["Services<br/>permissions · catalogue · access_requests · admin"]
-      ORM["SQLAlchemy models<br/>User · Dataset · Classification · SourceSystem · AccessRequest · LoginAttempt"]
+      SVC["Services<br/>permissions · catalogue · access_requests · admin · audit"]
+      ORM["SQLAlchemy models<br/>User · Dataset · Classification · SourceSystem · AccessRequest · LoginAttempt · AuditEvent"]
       MW --> BP --> SVC --> ORM
     end
     ORM -->|pg8000| DB[("Supabase PostgreSQL")]
@@ -99,25 +101,26 @@ flowchart TB
 .
 ├── app/
 │   ├── __init__.py            # App factory, extension init, CLI commands, routes
-│   ├── config.py              # Dev / Test / Prod configuration classes
+│   ├── config.py              # Dev / Test / Prod configuration classes + prod validation
 │   ├── db.py                  # SQLAlchemy instance re-export
 │   ├── errors.py              # 403/404/500/429 handlers
-│   ├── extensions.py          # db, login_manager, csrf, limiter, talisman
+│   ├── extensions.py          # db, login_manager, csrf, limiter, talisman, migrate
 │   ├── auth/                  # Registration, login, logout
 │   ├── catalogue/             # Browse, search, dataset detail, access requests
 │   ├── admin/                 # Dataset/classification/source-system/user management
-│   ├── models/                # User, Dataset, Classification, SourceSystem, AccessRequest, LoginAttempt
+│   ├── models/                # User, Dataset, Classification, SourceSystem, AccessRequest, LoginAttempt, AuditEvent
 │   ├── security/              # role_required decorator
-│   ├── services/              # permissions, catalogue, access_requests, admin (business logic)
+│   ├── services/              # permissions, catalogue, access_requests, admin, audit (business logic)
 │   ├── static/                # CSS, JS and assets
 │   └── templates/             # Jinja2 templates (auto-escaped)
+├── migrations/                # Flask-Migrate / Alembic migration scripts
 ├── scripts/
-│   ├── seed.py                # Idempotent demo-data seeding
+│   ├── seed.py                # Idempotent demo-data seeding (dev only)
 │   └── reset_password.py      # Reset one or all user passwords
 ├── supabase/
 │   └── schema.sql             # Reference PostgreSQL schema (DDL)
 ├── tests/                     # pytest suite incl. dedicated security tests
-├── .github/workflows/ci.yml   # Lint + test pipeline
+├── .github/workflows/ci.yml   # Lint + security audit + test pipeline
 ├── render.yaml                # Render deployment blueprint
 ├── requirements.txt           # Pinned dependencies
 ├── pyproject.toml             # black / isort / ruff / pytest config
@@ -126,19 +129,23 @@ flowchart TB
 
 ## Data model
 
-Six tables with UUID primary keys for core entities and serial integers for lookups, a range of data types (UUID, TEXT, INT, BIGINT, BOOLEAN, DATE, TIMESTAMPTZ, ENUM), foreign-key relationships, and database-level integrity constraints:
+Seven tables with UUID primary keys for core entities and serial integers for lookups, a range of data types (UUID, TEXT, INT, BIGINT, BOOLEAN, DATE, TIMESTAMPTZ, ENUM), foreign-key relationships, and database-level integrity constraints:
 
 - **`chk_decided`** — a decided access request must have both a decider and a decision timestamp; a pending one must have neither.
 - **`uq_pending_request`** — a partial unique index preventing duplicate *pending* requests for the same dataset/user.
 - **`chk_row_count_nonneg`** — dataset row counts cannot be negative.
+- **`ix_login_attempts_ip_at`** — composite index on `(ip_address, attempted_at)` for efficient rate-limit window queries.
 
-`login_attempts` records failed login attempts per IP address and is used by the rate limiter. Records older than one hour are pruned automatically on each failed attempt.
+`login_attempts` records failed login attempts per IP address; records older than one hour are pruned automatically on each failed attempt, and all records for an IP are cleared on successful login.
+
+`audit_events` is an append-only table. No UPDATE or DELETE routes exist for it. Every admin CRUD action (dataset, classification, source system, user role/status) and every access-request lifecycle event (created, approved, rejected) is written here.
 
 ```mermaid
 erDiagram
     USERS ||--o{ DATASETS : owns
     USERS ||--o{ ACCESS_REQUESTS : requests
     USERS ||--o{ ACCESS_REQUESTS : decides
+    USERS ||--o{ AUDIT_EVENTS : "is actor of"
     SOURCE_SYSTEMS ||--o{ DATASETS : "is source of"
     CLASSIFICATIONS ||--o{ DATASETS : classifies
     DATASETS ||--o{ ACCESS_REQUESTS : "is target of"
@@ -186,6 +193,15 @@ erDiagram
         text ip_address
         timestamptz attempted_at
     }
+    AUDIT_EVENTS {
+        int id PK
+        uuid actor_id FK
+        enum action
+        text target_type
+        text target_id
+        text meta
+        timestamptz created_at
+    }
 ```
 
 ## Security
@@ -194,12 +210,13 @@ Security is the focus of the application, with controls mapped to the **OWASP To
 
 | OWASP category | Control in this app | Where | Verified by |
 |---|---|---|---|
-| **A01 – Broken Access Control** | Server-side role enforcement (`role_required`, 403 on failure) and a per-object permission check (classification-rank gate + approved-request lookup) | `security/decorators.py`, `services/permissions.py` | `test_viewer_cannot_access_admin`, `test_viewer_blocked_from_restricted_dataset` |
-| **A02 – Cryptographic Failures** | Salted password hashing; HTTPS forced in production; `HttpOnly` / `SameSite=Lax` / `Secure` session cookies | `models/user.py`, `config.py` | `test_security_headers_in_prod` |
-| **A03 – Injection (SQLi & XSS)** | Parameterised queries via SQLAlchemy `ilike` (no string concatenation); Jinja2 auto-escaping | `services/catalogue.py`, templates | `test_sqli_search_is_neutralised`, `test_xss_payload_is_escaped` |
-| **A05 – Security Misconfiguration** | Talisman security headers + CSP; `DEBUG=False` in production | `extensions.py`, `config.py` | `test_prod_config_debug_off`, `test_security_headers_in_prod` |
-| **A07 – Identification & Auth Failures** | Password policy (≥12 chars, letter + number); database-backed login rate limiting (10 attempts per IP per minute, persists across restarts); password visibility toggle on sign-in; generic "Invalid email or password" message to prevent user enumeration | `auth/forms.py`, `auth/routes.py`, `models/login_attempt.py` | `test_register_rejects_short_password`, `test_login_invalid_credentials` |
+| **A01 – Broken Access Control** | Server-side role enforcement (`role_required`, 403 on failure); per-object permission check (classification-rank gate + approved-request lookup); gated dataset metadata masked on list and detail pages for viewers without access | `security/decorators.py`, `services/permissions.py`, `templates/catalogue/` | `test_viewer_cannot_access_admin`, `test_viewer_blocked_from_restricted_dataset`, `test_viewer_list_masks_gated_metadata` |
+| **A02 – Cryptographic Failures** | Explicit **scrypt** password hashing (no implicit algorithm fallback); HTTPS forced in production; `HttpOnly` / `SameSite=Lax` / `Secure` session cookies | `models/user.py`, `config.py` | `test_password_hash_uses_scrypt`, `test_session_cookie_samesite_in_prod` |
+| **A03 – Injection (SQLi & XSS)** | Parameterised queries via SQLAlchemy `ilike` (no string concatenation); Jinja2 auto-escaping on all output including stored data | `services/catalogue.py`, templates | `test_sqli_search_is_neutralised`, `test_xss_payload_is_escaped`, `test_stored_xss_escaped_in_list` |
+| **A05 – Security Misconfiguration** | Talisman security headers + strict CSP; `DEBUG=False` in production; `validate_prod_config()` raises at startup if `SECRET_KEY` or `DATABASE_URL` is missing/insecure | `extensions.py`, `config.py` | `test_prod_config_debug_off`, `test_security_headers_in_prod`, `test_csp_header_present_in_prod` |
+| **A07 – Identification & Auth Failures** | Password policy: ≥ 12 characters (NIST SP 800-63B — no mandatory character-class rules); database-backed login rate limiting (10 attempts/IP/minute, persists across Render cold-starts); attempts cleared on successful login; generic "Invalid email or password" message prevents user enumeration | `auth/forms.py`, `auth/routes.py`, `models/login_attempt.py` | `test_register_rejects_short_password`, `test_login_invalid_credentials`, `test_rate_limit_blocks_after_threshold`, `test_unknown_email_same_error_as_wrong_password`, `test_successful_login_clears_attempts` |
 | **CSRF** (A01-adjacent) | Flask-WTF CSRF tokens on all state-changing forms | `extensions.py`, templates | `test_missing_csrf_rejected` |
+| **Audit trail** | Append-only `AuditEvent` table records every CRUD action by admin users and every access-request lifecycle event | `models/audit_event.py`, `services/audit.py` | — |
 
 ## Getting started
 
@@ -259,7 +276,7 @@ flask --app run.py init-db
 flask --app run.py seed
 ```
 
-Seeding is idempotent — it skips if users already exist.
+`init-db` creates any missing tables (idempotent — safe to run on an existing database). `seed` is idempotent — it skips if users already exist.
 
 To reset a single user's password at any time:
 
@@ -288,11 +305,11 @@ Configuration is environment-driven and selected by `FLASK_CONFIG` (`dev`, `test
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes (dev/prod) | SQLAlchemy database URI. SQLite for local (`sqlite:///catalogue.db`); for Postgres on Supabase use `postgresql+pg8000://...` on the pooler port `6543`. Not needed for the test config (uses in-memory SQLite). |
-| `SECRET_KEY` | Yes | Flask session signing key. Use a long random value in production. |
+| `SECRET_KEY` | Yes | Flask session signing key. Use a long random value in production. The `prod` config will refuse to start if this is missing or uses a known placeholder. |
 | `FLASK_CONFIG` | No | `dev` (default), `test`, or `prod`. |
 | `RESET_ALL_PASSWORDS` | No | When set, the `seed` command resets **every** user's password to this value on the next startup instead of skipping. Remove the variable after the first deploy so it does not run again. Useful for password resets without shell access (e.g. Render free tier). |
 
-The `prod` configuration enables HTTPS enforcement, a strict Content-Security-Policy, secure cookies, `DEBUG=False`, and a `ProxyFix` middleware for running behind Render's proxy.
+The `prod` configuration enables HTTPS enforcement, a strict Content-Security-Policy, secure cookies, `DEBUG=False`, and a `ProxyFix` middleware for running behind Render's proxy. It also validates that `SECRET_KEY` and `DATABASE_URL` are set to non-placeholder values at startup.
 
 ## Test accounts
 
@@ -307,7 +324,7 @@ Created by the seed script. Default password for all accounts: `CatalogueDemo202
 
 ## Running the tests
 
-The suite covers authentication, catalogue, admin, the services layer, and a dedicated security module (CSRF, SQL injection, XSS, security headers, production hardening).
+The suite covers authentication, catalogue, admin, the services layer, and a dedicated security module (CSRF, SQL injection, reflected and stored XSS, CSP headers, session cookie attributes, rate limiting, password hashing, metadata masking, production hardening).
 
 ```bash
 # macOS / Linux
@@ -333,9 +350,11 @@ ruff check app tests scripts
 
 Every push and pull request to `main` triggers the GitHub Actions pipeline (`.github/workflows/ci.yml`), which on Python 3.12:
 
-1. Checks formatting with **black** and **isort**.
-2. Lints with **ruff**.
-3. Runs the **pytest** suite with the 80% coverage gate.
+1. Installs dependencies.
+2. Runs **pip-audit** to flag known CVEs in the dependency tree.
+3. Checks formatting with **black** and **isort**.
+4. Lints with **ruff**.
+5. Runs the **pytest** suite with the 80% coverage gate.
 
 A pull request must pass all checks before it can be merged.
 
@@ -346,11 +365,13 @@ The app is deployed to **Render** as a web service, defined declaratively in `re
 1. Push the repository to GitHub.
 2. In [Render](https://render.com), create a **Web Service** from the repo (or use **New → Blueprint** so `render.yaml` is detected).
 3. Set `DATABASE_URL` to your Supabase pooler URI (`postgresql+pg8000://...`, port `6543`). `SECRET_KEY` is generated automatically and `FLASK_CONFIG` is set to `prod` by the blueprint.
-4. Deploy. On startup the service runs `init-db` and `seed`, then starts Gunicorn:
+4. Deploy. On startup the service runs `init-db` (which creates any missing tables idempotently, including the new `audit_events` table on existing deployments), then starts Gunicorn:
    ```
-   flask --app run.py init-db && flask --app run.py seed && gunicorn run:app --bind 0.0.0.0:$PORT
+   flask --app run.py init-db && gunicorn run:app --bind 0.0.0.0:$PORT
    ```
 5. Open the Render URL and sign in with the test accounts.
+
+> **Seeding on Render:** The seed command is intentionally excluded from the production startup command — it is a development-only command that will refuse to run in production. To populate demo data, set the `RESET_ALL_PASSWORDS` environment variable on the first deploy (see [Configuration](#configuration)).
 
 ## Health check
 
@@ -360,15 +381,17 @@ A lightweight endpoint at `/health/db` confirms database connectivity and is sui
 { "database": "connected" }
 ```
 
+Errors are logged server-side only; the response body never exposes raw exception text.
+
 ## Known limitations & future work
 
 Documented honestly to support critical evaluation. None of these block the core use case; they are the natural next iterations:
 
-- **No structured logging or audit trail.** The app reports errors to the user but does not log them, and access decisions are not recorded beyond the `decided_by`/`decided_at` fields on a request. A dedicated audit log of access decisions and admin actions would reinforce the governance goal and is the single highest-value improvement.
 - **Open self-registration.** Anyone can register a viewer account. For an internal tool this would be better restricted to a verified email domain or gated behind admin approval.
 - **No MFA or account lockout.** Authentication relies on password strength and database-backed rate limiting; multi-factor authentication and progressive lockout would harden it further.
 - **Catalogue queries are unpaginated** and use lazy relationship loading. Eager loading and pagination would improve performance at scale.
 - **The sensitivity boundary is rank-based** (`rank >= 3`). A dedicated `is_sensitive` flag on classifications would make the security boundary explicit and resistant to rank reordering.
+- **Audit log is write-only.** The `audit_events` table is written on every admin action but there is no UI to browse or export the audit trail yet.
 
 ## Academic note
 

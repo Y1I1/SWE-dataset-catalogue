@@ -36,3 +36,67 @@ def test_security_headers_in_prod(monkeypatch):
     client = app.test_client()
     response = client.get("/auth/login", follow_redirects=True)
     assert response.headers.get("X-Frame-Options") == "SAMEORIGIN"
+
+
+def test_csp_header_present_in_prod(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SECRET_KEY", "prod-test-secret")
+    app = create_app("prod")
+    client = app.test_client()
+    response = client.get("/auth/login", follow_redirects=True)
+    csp = response.headers.get("Content-Security-Policy", "")
+    assert "default-src" in csp
+    assert "'self'" in csp
+
+
+def test_session_cookie_samesite_in_prod(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SECRET_KEY", "prod-test-secret")
+    app = create_app("prod")
+    assert app.config.get("SESSION_COOKIE_SAMESITE") == "Lax"
+    assert app.config.get("SESSION_COOKIE_HTTPONLY") is True
+    assert app.config.get("SESSION_COOKIE_SECURE") is True
+
+
+def test_password_hash_uses_scrypt(app):
+    from app.models import User
+
+    with app.app_context():
+        user = User.query.filter_by(email="viewer@catalogue.test").one()
+        assert user.password_hash.startswith("scrypt:")
+
+
+def test_viewer_list_masks_gated_metadata(client, viewer_user):
+    login(client, viewer_user.email)
+    response = client.get("/catalogue/")
+    assert response.status_code == 200
+    body = response.data.decode()
+    # Public dataset name is visible
+    assert "Customer Master" in body
+    # OneLake is used only by Revenue Forecast (Confidential) — must not appear in a table cell
+    assert "<td>OneLake</td>" not in body
+
+
+def test_stored_xss_escaped_in_list(client, admin_user, app):
+    from app.db import db
+    from app.models import Classification, Dataset, SourceSystem
+
+    login(client, admin_user.email)
+    with app.app_context():
+        cls = Classification.query.filter_by(label="Public").one()
+        sys = SourceSystem.query.filter_by(name="Salesforce").one()
+        xss_dataset = Dataset(
+            name='<script>alert("xss")</script>',
+            description="XSS test dataset",
+            classification_id=cls.id,
+            source_system_id=sys.id,
+            owner_id=admin_user.id,
+            row_count=0,
+            refresh_frequency="daily",
+        )
+        db.session.add(xss_dataset)
+        db.session.commit()
+
+    response = client.get("/catalogue/")
+    assert b"<script>alert" not in response.data
+    assert b"&lt;script&gt;" in response.data

@@ -8,9 +8,9 @@ from flask_login import current_user
 from app.admin import admin_bp
 from app.auth import auth_bp
 from app.catalogue import catalogue_bp
-from app.config import config_by_name, get_config_name
+from app.config import config_by_name, get_config_name, validate_prod_config
 from app.errors import register_error_handlers
-from app.extensions import csrf, db, limiter, login_manager, talisman
+from app.extensions import csrf, db, limiter, login_manager, migrate, talisman
 from app.models import User
 
 
@@ -26,11 +26,13 @@ def create_app(config_name: str | None = None) -> Flask:
             app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
     if config_name in ("prod", "production"):
+        validate_prod_config(app)
         from werkzeug.middleware.proxy_fix import ProxyFix
 
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     db.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
@@ -71,13 +73,12 @@ def _register_routes(app: Flask) -> None:
     def health_db():
         from sqlalchemy import text
 
-        if not app.config.get("SQLALCHEMY_DATABASE_URI"):
-            return {"database": "error", "message": "DATABASE_URL not set"}, 500
         try:
             db.session.execute(text("SELECT 1"))
             return {"database": "connected"}
-        except Exception as exc:
-            return {"database": "error", "message": str(exc)}, 500
+        except Exception:
+            app.logger.exception("Health check database query failed")
+            return {"database": "error"}, 500
 
 
 def _register_cli(app: Flask) -> None:
@@ -90,6 +91,13 @@ def _register_cli(app: Flask) -> None:
 
     @app.cli.command("seed")
     def seed_cmd():
+        config_name = get_config_name()
+        if config_name in ("prod", "production"):
+            click.echo(
+                "Error: 'seed' is a development-only command and cannot run in production.",
+                err=True,
+            )
+            raise SystemExit(1)
         from scripts.seed import run_seed
 
         run_seed()
