@@ -47,6 +47,7 @@ Sensitivity is modelled as ranked **classifications** (Public → Internal → C
 - View full metadata for any dataset they are entitled to see.
 - Request access to gated (Confidential/Restricted) datasets with a written justification.
 - Track the status of their own access requests.
+- Toggle password visibility on the sign-in form.
 
 **Administrators** can do all of the above, plus:
 - Manage datasets, classifications and source systems (create, edit, deactivate/delete).
@@ -63,7 +64,7 @@ Sensitivity is modelled as ranked **classifications** (Public → Internal → C
 | Forms & CSRF | Flask-WTF + WTForms |
 | Authentication | Flask-Login |
 | Security headers / CSP | Flask-Talisman |
-| Rate limiting | Flask-Limiter |
+| Rate limiting | Database-backed login attempt tracking (`LoginAttempt` model) |
 | Database (production) | PostgreSQL on Supabase (via the `pg8000` driver) |
 | Database (tests) | SQLite (in-memory) |
 | WSGI server | Gunicorn |
@@ -86,7 +87,7 @@ flowchart TB
         AD["admin"]
       end
       SVC["Services<br/>permissions · catalogue · access_requests · admin"]
-      ORM["SQLAlchemy models<br/>User · Dataset · Classification · SourceSystem · AccessRequest"]
+      ORM["SQLAlchemy models<br/>User · Dataset · Classification · SourceSystem · AccessRequest · LoginAttempt"]
       MW --> BP --> SVC --> ORM
     end
     ORM -->|pg8000| DB[("Supabase PostgreSQL")]
@@ -105,13 +106,14 @@ flowchart TB
 │   ├── auth/                  # Registration, login, logout
 │   ├── catalogue/             # Browse, search, dataset detail, access requests
 │   ├── admin/                 # Dataset/classification/source-system/user management
-│   ├── models/                # User, Dataset, Classification, SourceSystem, AccessRequest
+│   ├── models/                # User, Dataset, Classification, SourceSystem, AccessRequest, LoginAttempt
 │   ├── security/              # role_required decorator
 │   ├── services/              # permissions, catalogue, access_requests, admin (business logic)
-│   ├── static/                # CSS and assets
+│   ├── static/                # CSS, JS and assets
 │   └── templates/             # Jinja2 templates (auto-escaped)
 ├── scripts/
-│   └── seed.py                # Idempotent demo-data seeding
+│   ├── seed.py                # Idempotent demo-data seeding
+│   └── reset_password.py      # Reset one or all user passwords
 ├── supabase/
 │   └── schema.sql             # Reference PostgreSQL schema (DDL)
 ├── tests/                     # pytest suite incl. dedicated security tests
@@ -124,11 +126,13 @@ flowchart TB
 
 ## Data model
 
-Five tables with UUID primary keys for core entities and serial integers for lookups, a range of data types (UUID, TEXT, INT, BIGINT, BOOLEAN, DATE, TIMESTAMPTZ, ENUM), foreign-key relationships, and database-level integrity constraints:
+Six tables with UUID primary keys for core entities and serial integers for lookups, a range of data types (UUID, TEXT, INT, BIGINT, BOOLEAN, DATE, TIMESTAMPTZ, ENUM), foreign-key relationships, and database-level integrity constraints:
 
 - **`chk_decided`** — a decided access request must have both a decider and a decision timestamp; a pending one must have neither.
 - **`uq_pending_request`** — a partial unique index preventing duplicate *pending* requests for the same dataset/user.
 - **`chk_row_count_nonneg`** — dataset row counts cannot be negative.
+
+`login_attempts` records failed login attempts per IP address and is used by the rate limiter. Records older than one hour are pruned automatically on each failed attempt.
 
 ```mermaid
 erDiagram
@@ -177,6 +181,11 @@ erDiagram
         uuid decided_by FK
         timestamptz decided_at
     }
+    LOGIN_ATTEMPTS {
+        int id PK
+        text ip_address
+        timestamptz attempted_at
+    }
 ```
 
 ## Security
@@ -189,7 +198,7 @@ Security is the focus of the application, with controls mapped to the **OWASP To
 | **A02 – Cryptographic Failures** | Salted password hashing; HTTPS forced in production; `HttpOnly` / `SameSite=Lax` / `Secure` session cookies | `models/user.py`, `config.py` | `test_security_headers_in_prod` |
 | **A03 – Injection (SQLi & XSS)** | Parameterised queries via SQLAlchemy `ilike` (no string concatenation); Jinja2 auto-escaping | `services/catalogue.py`, templates | `test_sqli_search_is_neutralised`, `test_xss_payload_is_escaped` |
 | **A05 – Security Misconfiguration** | Talisman security headers + CSP; `DEBUG=False` in production | `extensions.py`, `config.py` | `test_prod_config_debug_off`, `test_security_headers_in_prod` |
-| **A07 – Identification & Auth Failures** | Password policy (≥12 chars, letter + number); login rate limiting; generic "Invalid email or password" message to prevent user enumeration | `auth/forms.py`, `auth/routes.py` | `test_register_rejects_short_password`, `test_login_invalid_credentials` |
+| **A07 – Identification & Auth Failures** | Password policy (≥12 chars, letter + number); database-backed login rate limiting (10 attempts per IP per minute, persists across restarts); password visibility toggle on sign-in; generic "Invalid email or password" message to prevent user enumeration | `auth/forms.py`, `auth/routes.py`, `models/login_attempt.py` | `test_register_rejects_short_password`, `test_login_invalid_credentials` |
 | **CSRF** (A01-adjacent) | Flask-WTF CSRF tokens on all state-changing forms | `extensions.py`, templates | `test_missing_csrf_rejected` |
 
 ## Getting started
@@ -252,6 +261,18 @@ flask --app run.py seed
 
 Seeding is idempotent — it skips if users already exist.
 
+To reset a single user's password at any time:
+
+```bash
+python scripts/reset_password.py user@example.com NewPassword123!
+```
+
+To reset **all** users at once (useful after a fresh database restore):
+
+```bash
+python scripts/reset_password.py --all CatalogueDemo2026!
+```
+
 ### 5. Run the app
 
 ```bash
@@ -269,6 +290,7 @@ Configuration is environment-driven and selected by `FLASK_CONFIG` (`dev`, `test
 | `DATABASE_URL` | Yes (dev/prod) | SQLAlchemy database URI. SQLite for local (`sqlite:///catalogue.db`); for Postgres on Supabase use `postgresql+pg8000://...` on the pooler port `6543`. Not needed for the test config (uses in-memory SQLite). |
 | `SECRET_KEY` | Yes | Flask session signing key. Use a long random value in production. |
 | `FLASK_CONFIG` | No | `dev` (default), `test`, or `prod`. |
+| `RESET_ALL_PASSWORDS` | No | When set, the `seed` command resets **every** user's password to this value on the next startup instead of skipping. Remove the variable after the first deploy so it does not run again. Useful for password resets without shell access (e.g. Render free tier). |
 
 The `prod` configuration enables HTTPS enforcement, a strict Content-Security-Policy, secure cookies, `DEBUG=False`, and a `ProxyFix` middleware for running behind Render's proxy.
 
@@ -343,9 +365,8 @@ A lightweight endpoint at `/health/db` confirms database connectivity and is sui
 Documented honestly to support critical evaluation. None of these block the core use case; they are the natural next iterations:
 
 - **No structured logging or audit trail.** The app reports errors to the user but does not log them, and access decisions are not recorded beyond the `decided_by`/`decided_at` fields on a request. A dedicated audit log of access decisions and admin actions would reinforce the governance goal and is the single highest-value improvement.
-- **Rate limiting is in-memory.** `Flask-Limiter` uses an in-memory store, so login throttling is per-process and resets on restart. A shared backend (e.g. Redis) would make it effective across multiple Gunicorn workers.
 - **Open self-registration.** Anyone can register a viewer account. For an internal tool this would be better restricted to a verified email domain or gated behind admin approval.
-- **No MFA or account lockout.** Authentication relies on password strength and rate limiting; multi-factor authentication and progressive lockout would harden it further.
+- **No MFA or account lockout.** Authentication relies on password strength and database-backed rate limiting; multi-factor authentication and progressive lockout would harden it further.
 - **Catalogue queries are unpaginated** and use lazy relationship loading. Eager loading and pagination would improve performance at scale.
 - **The sensitivity boundary is rank-based** (`rank >= 3`). A dedicated `is_sensitive` flag on classifications would make the security boundary explicit and resistant to rank reordering.
 
