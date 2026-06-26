@@ -6,6 +6,8 @@
 
 A secure, centralised Flask web application for discovering datasets across an organisation and requesting access to sensitive ones through a formal approval workflow. Built as the secure-application component for the **Software Engineering and DevOps** module (Level 6 Digital & Technology Solutions degree apprenticeship).
 
+Link to Application: https://dataset-catalogue.onrender.com
+
 ---
 
 ## Contents
